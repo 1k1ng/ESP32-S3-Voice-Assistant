@@ -7,6 +7,9 @@ substitutions:
   mic_dout: GPIO4
   spk_din: GPIO5
 
+  i2c_sda: GPIO10
+  i2c_scl: GPIO11
+
   #amp_sd_pin: GPIO18
 
 esphome:
@@ -36,12 +39,12 @@ api:
     key: !secret api_key
   on_client_connected:
     then:
-      - delay: 100ms
+      - delay: 600ms
       - if:
           condition:
             switch.is_off: mic_mute
           then:
-            - micro_wake_word.start
+            - script.execute: start_wake_word
             - script.execute: led_ready
           else:
             - script.execute: led_mute
@@ -71,6 +74,12 @@ psram:
   speed: 80MHz
   ignore_not_found: true
 
+i2c:
+  sda: ${i2c_sda}
+  scl: ${i2c_scl}
+  scan: true
+  frequency: 400kHz
+
 
 captive_portal:
 
@@ -80,6 +89,14 @@ web_server:
 safe_mode:
   boot_is_good_after: 10s
   num_attempts: 20
+
+font:
+  - file: "gfonts://Roboto Mono"
+    id: font_small
+    size: 10
+  - file: "gfonts://Roboto Mono"
+    id: font_big
+    size: 14
 
 sensor:
   - platform: uptime
@@ -92,7 +109,7 @@ text_sensor:
   - platform: wifi_info
     ip_address:
       name: "IP Address"
-
+      id: ip_addr
 button:
   - platform: restart
     name: "Restart"
@@ -161,6 +178,29 @@ switch:
             api.connected
           then:
             - script.execute: start_wake_word
+
+display:
+  - platform: ssd1306_i2c
+    model: "SSD1306 128x32"
+    address: 0x3C
+    update_interval: 500ms
+    lambda: |-
+      if (id(ip_addr).has_state()) {
+        it.printf(0, 0, id(font_small), "IP %s", id(ip_addr).state.c_str());
+      } else {
+        it.print(0, 0, id(font_small), "IP ...");
+      }
+
+      if (id(mic_mute).state) {
+        it.print(0, 16, id(font_big), "MUTE");
+      } else if (id(va).is_running()) {
+        it.print(0, 16, id(font_big), "AKTIV");
+      } else if (id(mww).is_running()) {
+        it.print(0, 16, id(font_big), "BEREIT");
+      } else {
+        it.print(0, 16, id(font_big), "WARTET");
+      }
+
 
 binary_sensor:
   - platform: status
@@ -285,6 +325,7 @@ micro_wake_word:
       id: jarvis_model
     - model: okay_nabu
       id: nabu_model
+
   on_wake_word_detected:
     then:
       - script.execute: stop_wake_word
@@ -294,6 +335,16 @@ micro_wake_word:
           then:
             - voice_assistant.start:
                 wake_word: !lambda return wake_word;
+            - delay: 2s
+            - if:
+                condition:
+                  not:
+                    voice_assistant.is_running
+                then:
+                  - script.execute: start_wake_word
+          else:
+            - script.execute: start_wake_word
+
 
 voice_assistant:
   id: va
@@ -338,6 +389,8 @@ voice_assistant:
     then:
       - script.execute: led_error
       - delay: 1s
+      - script.execute: led_ready
+      - delay: 300ms
       - script.execute: start_wake_word
 
 select:
@@ -369,6 +422,17 @@ select:
         - script.execute: start_wake_word
 
 script:
+  - id: apply_wake_word_model
+    then:
+      - if:
+          condition:
+            lambda: return id(wake_word_select).state == "Nabu";
+          then:
+            - micro_wake_word.enable_model: nabu_model
+            - micro_wake_word.disable_model: jarvis_model
+          else:
+            - micro_wake_word.enable_model: jarvis_model
+            - micro_wake_word.disable_model: nabu_model
   - id: start_wake_word
     then:
       - if:
@@ -378,9 +442,12 @@ script:
               - switch.is_off: mic_mute
               - not:
                   voice_assistant.is_running
+              - not:
+                  micro_wake_word.is_running
           then:
+            - script.execute: apply_wake_word_model
+            - delay: 100ms
             - micro_wake_word.start
-
   - id: stop_wake_word
     then:
       - micro_wake_word.stop
@@ -401,13 +468,7 @@ script:
 
   - id: led_ready
     then:
-      - light.turn_on:
-          id: led_ring
-          brightness: 18%
-          red: 0%
-          green: 100%
-          blue: 0%
-          effect: none
+      - light.turn_off: led_ring
 
   - id: led_mute
     then:

@@ -1,0 +1,460 @@
+substitutions:
+  led_pin: GPIO15
+  button_pin: GPIO17
+
+  i2s_lrclk: GPIO6
+  i2s_bclk: GPIO7
+  mic_dout: GPIO4
+  spk_din: GPIO5
+
+  #amp_sd_pin: GPIO18
+
+esphome:
+  name: esp32s3-voice-assistant
+  friendly_name: ESP32 S3 Voice Assistant
+  name_add_mac_suffix: false
+  on_boot:
+    priority: 600
+    then:
+      - delay: 800ms
+      - script.execute: led_boot
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_I2S_SUPPRESS_DEPRECATE_WARN: y
+
+logger:
+  level: INFO
+  baud_rate: 115200
+
+api:
+  encryption:
+    key: !secret api_key
+  on_client_connected:
+    then:
+      - delay: 100ms
+      - if:
+          condition:
+            switch.is_off: mic_mute
+          then:
+            - micro_wake_word.start
+            - script.execute: led_ready
+          else:
+            - script.execute: led_mute
+  on_client_disconnected:
+    then:
+      - micro_wake_word.stop
+      - voice_assistant.stop
+      #- switch.turn_off: amp_enable
+      - script.execute: led_off
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: esp32s3-va-fallback
+    password: !secret ap_password
+
+network:
+  enable_high_performance: false
+
+psram:
+  mode: octal
+  speed: 80MHz
+  ignore_not_found: true
+
+
+captive_portal:
+
+web_server:
+  port: 80
+
+safe_mode:
+  boot_is_good_after: 10s
+  num_attempts: 20
+
+sensor:
+  - platform: uptime
+    name: "Uptime"
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 30s
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+
+button:
+  - platform: restart
+    name: "Restart"
+
+light:
+  - platform: esp32_rmt_led_strip
+    id: led_ring
+    name: "LED Ring"
+    pin: ${led_pin}
+    num_leds: 45
+    chipset: ws2812
+    rgb_order: GRB
+    restore_mode: ALWAYS_OFF
+    default_transition_length: 0s
+    max_refresh_rate: 20ms
+    reset_low: 300us
+    use_dma: true
+    rmt_symbols: 1536
+    use_psram: false
+    effects:
+      - pulse:
+          name: slow_pulse
+          transition_length: 250ms
+          update_interval: 250ms
+          min_brightness: 15%
+          max_brightness: 60%
+      - pulse:
+          name: fast_pulse
+          transition_length: 120ms
+          update_interval: 120ms
+          min_brightness: 20%
+          max_brightness: 80%
+      - addressable_scan:
+          name: scan
+          move_interval: 80ms
+          scan_width: 2
+
+switch:
+  #- platform: gpio
+  #  id: amp_enable
+  #  name: "Amp Enable"
+  #  internal: true
+  #  pin:
+  #    number: ${amp_sd_pin}
+  #    mode:
+  #      output: true
+  #  restore_mode: ALWAYS_OFF
+
+  - platform: template
+    id: mic_mute
+    name: "Mute"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      - micro_wake_word.stop
+      - voice_assistant.stop
+      - microphone.mute: mic_hw
+      #- switch.turn_off: amp_enable
+      - script.execute: led_mute
+    on_turn_off:
+      - microphone.unmute: mic_hw
+      - delay: 200ms
+      - script.execute: led_ready
+      - if:
+          condition:
+            api.connected
+          then:
+            - script.execute: start_wake_word
+
+binary_sensor:
+  - platform: status
+    name: "ESP Status"
+
+  - platform: gpio
+    id: touch_button
+    name: "Touch Button"
+    disabled_by_default: false
+    pin:
+      number: ${button_pin}
+      mode: INPUT_PULLUP
+      inverted: true
+    filters:
+      - delayed_on: 30ms
+      - delayed_off: 30ms
+
+    on_multi_click:
+      - timing:
+          - ON for at most 350ms
+          - OFF for at least 200ms
+        then:
+          - light.toggle: led_ring
+
+      - timing:
+          - ON for at most 350ms
+          - OFF for at most 250ms
+          - ON for at most 350ms
+          - OFF for at least 200ms
+        then:
+          - switch.toggle: mic_mute
+
+      - timing:
+          - ON for at least 800ms
+        then:
+          - if:
+              condition:
+                switch.is_off: mic_mute
+              then:
+                - voice_assistant.start
+
+    on_release:
+      then:
+        - if:
+            condition:
+              voice_assistant.is_running
+            then:
+              - voice_assistant.stop
+
+i2s_audio:
+  - id: i2s_bus
+    i2s_lrclk_pin: GPIO6
+    i2s_bclk_pin: GPIO7
+    use_legacy: true
+
+microphone:
+  - platform: i2s_audio
+    id: mic_hw
+    i2s_audio_id: i2s_bus
+    adc_type: external
+    i2s_din_pin: GPIO4
+    channel: left
+    sample_rate: 16000
+    bits_per_sample: 32bit
+    use_apll: true
+    pdm: false
+
+speaker:
+  - platform: i2s_audio
+    id: spk_out
+    i2s_audio_id: i2s_bus
+    dac_type: external
+    i2s_dout_pin: GPIO5
+    channel: mono
+    sample_rate: 16000
+    bits_per_sample: 16bit
+    use_apll: true
+    buffer_duration: 200ms
+
+  - platform: mixer
+    id: spk_mixer
+    output_speaker: spk_out
+    source_speakers:
+      - id: ann_in
+      - id: media_in
+
+  - platform: resampler
+    id: ann_resamp
+    output_speaker: ann_in
+
+  - platform: resampler
+    id: media_resamp
+    output_speaker: media_in
+
+media_player:
+  - platform: speaker
+    name: "ESP32 Speaker"
+    id: esp32_media
+    buffer_size: 48000
+    codec_support_enabled: false
+    announcement_pipeline:
+      speaker: spk_out
+      num_channels: 1
+      format: WAV
+      sample_rate: 16000
+    #media_pipeline:
+    #  speaker: media_resamp
+    #  num_channels: 1
+    #  format: MP3
+    #  sample_rate: 24000
+
+
+micro_wake_word:
+  id: mww
+  microphone:
+    microphone: mic_hw
+    channels: 0
+    gain_factor: 4
+  vad:
+  models:
+    - model: hey_jarvis
+      id: jarvis_model
+    - model: okay_nabu
+      id: nabu_model
+  on_wake_word_detected:
+    then:
+      - script.execute: stop_wake_word
+      - if:
+          condition:
+            switch.is_off: mic_mute
+          then:
+            - voice_assistant.start:
+                wake_word: !lambda return wake_word;
+
+voice_assistant:
+  id: va
+  micro_wake_word: mww
+  use_wake_word: false
+  microphone:
+    microphone: mic_hw
+    channels: 0
+    gain_factor: 4
+  media_player: esp32_media
+  noise_suppression_level: 2
+  auto_gain: 31dBFS
+  volume_multiplier: 15.0
+
+  on_listening:
+    then:
+      - script.execute: led_listening
+
+  on_stt_vad_end:
+    then:
+      - script.execute: led_thinking
+
+  on_tts_start:
+    then:
+      - script.execute: led_speaking
+
+  on_tts_end:
+    then:
+      - delay: 150ms
+      - script.execute: led_ready
+
+  on_start:
+    then:
+      - script.execute: stop_wake_word
+
+  on_end:
+    then:
+      - script.execute: led_ready
+      - script.execute: start_wake_word
+
+  on_error:
+    then:
+      - script.execute: led_error
+      - delay: 1s
+      - script.execute: start_wake_word
+
+select:
+  - platform: template
+    name: "Wake word"
+    id: wake_word_select
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    options:
+      - Jarvis
+      - Nabu
+    initial_option: Jarvis
+    on_value:
+      then:
+        - script.execute: stop_wake_word
+        - if:
+            condition:
+              lambda: return x == "Jarvis";
+            then:
+              - micro_wake_word.enable_model: jarvis_model
+              - micro_wake_word.disable_model: nabu_model
+        - if:
+            condition:
+              lambda: return x == "Nabu";
+            then:
+              - micro_wake_word.enable_model: nabu_model
+              - micro_wake_word.disable_model: jarvis_model
+        - script.execute: start_wake_word
+
+script:
+  - id: start_wake_word
+    then:
+      - if:
+          condition:
+            and:
+              - api.connected
+              - switch.is_off: mic_mute
+              - not:
+                  voice_assistant.is_running
+          then:
+            - micro_wake_word.start
+
+  - id: stop_wake_word
+    then:
+      - micro_wake_word.stop
+  - id: led_boot
+    then:
+      - light.turn_on:
+          id: led_ring
+          brightness: 12%
+          red: 100%
+          green: 100%
+          blue: 100%
+      - delay: 700ms
+      - light.turn_off: led_ring
+
+  - id: led_off
+    then:
+      - light.turn_off: led_ring
+
+  - id: led_ready
+    then:
+      - light.turn_on:
+          id: led_ring
+          brightness: 18%
+          red: 0%
+          green: 100%
+          blue: 0%
+          effect: none
+
+  - id: led_mute
+    then:
+      - light.turn_on:
+          id: led_ring
+          brightness: 25%
+          red: 100%
+          green: 0%
+          blue: 0%
+          effect: none
+
+  - id: led_listening
+    then:
+      - light.turn_on:
+          id: led_ring
+          brightness: 30%
+          red: 0%
+          green: 40%
+          blue: 100%
+          effect: slow_pulse
+
+  - id: led_thinking
+    then:
+      - light.turn_on:
+          id: led_ring
+          brightness: 30%
+          red: 100%
+          green: 60%
+          blue: 0%
+          effect: fast_pulse
+
+  - id: led_speaking
+    then:
+      - light.turn_on:
+          id: led_ring
+          brightness: 35%
+          red: 100%
+          green: 100%
+          blue: 100%
+          effect: scan
+
+  - id: led_error
+    then:
+      - light.turn_on:
+          id: led_ring
+          brightness: 60%
+          red: 100%
+          green: 0%
+          blue: 0%
+          effect: fast_pulse

@@ -67,12 +67,12 @@ wifi:
     password: !secret ap_password
 
 network:
-  enable_high_performance: false
+  enable_high_performance: true
 
 psram:
   mode: octal
   speed: 80MHz
-  ignore_not_found: true
+  ignore_not_found: false
 
 i2c:
   sda: ${i2c_sda}
@@ -201,6 +201,10 @@ display:
         it.print(0, 16, id(font_big), "WARTET");
       }
 
+interval:
+  - interval: 5s
+    then:
+      - script.execute: start_wake_word
 
 binary_sensor:
   - platform: status
@@ -254,7 +258,7 @@ i2s_audio:
   - id: i2s_bus
     i2s_lrclk_pin: GPIO6
     i2s_bclk_pin: GPIO7
-    use_legacy: true
+    use_legacy: false
 
 microphone:
   - platform: i2s_audio
@@ -275,7 +279,7 @@ speaker:
     dac_type: external
     i2s_dout_pin: GPIO5
     channel: mono
-    sample_rate: 16000
+    sample_rate: 44100
     bits_per_sample: 16bit
     use_apll: true
     buffer_duration: 200ms
@@ -299,18 +303,39 @@ media_player:
   - platform: speaker
     name: "ESP32 Speaker"
     id: esp32_media
-    buffer_size: 48000
-    codec_support_enabled: false
+    buffer_size: 131072
+    codec_support_enabled: true
+
     announcement_pipeline:
       speaker: spk_out
-      num_channels: 1
+      #num_channels: 1
       format: WAV
-      sample_rate: 16000
-    #media_pipeline:
-    #  speaker: media_resamp
-    #  num_channels: 1
-    #  format: MP3
-    #  sample_rate: 24000
+      sample_rate: 44100
+
+    media_pipeline:
+      speaker: media_resamp
+      #num_channels: 1
+      format: WAV
+      sample_rate: 44100
+
+    on_play:
+      then:
+        - micro_wake_word.stop
+        - voice_assistant.stop
+        - microphone.mute: mic_hw
+        - script.execute: led_off
+
+    on_idle:
+      then:
+        - microphone.unmute: mic_hw
+        - script.execute: led_ready
+        - script.execute: start_wake_word
+
+    on_pause:
+      then:
+        - microphone.unmute: mic_hw
+        - script.execute: led_ready
+        - script.execute: start_wake_word
 
 
 micro_wake_word:
@@ -369,16 +394,19 @@ voice_assistant:
 
   on_tts_start:
     then:
+      - script.execute: start_wake_word
       - script.execute: led_speaking
 
   on_tts_end:
     then:
       - delay: 150ms
       - script.execute: led_ready
+      - script.execute: start_wake_word
 
   on_start:
     then:
       - script.execute: stop_wake_word
+      - script.execute: start_wake_word
 
   on_end:
     then:

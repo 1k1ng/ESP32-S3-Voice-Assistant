@@ -232,11 +232,7 @@ display:
            it.print(x, y, id(font_big), TextAlign::CENTER, "(◕‿‿◕)");
         }
       } else if (id(mww).is_running()) {
-        if ((millis() / 2000) % 2 == 0) {
-          it.print(x, y, id(font_big), TextAlign::CENTER, "(-‿‿-)"); 
-        } else {
-          it.print(x, y, id(font_big), TextAlign::CENTER, "(≖‿‿≖)");
-        }
+        it.print(x, y, id(font_big), TextAlign::CENTER, "(-‿‿-)"); 
       } else {
         it.print(x, y, id(font_big), TextAlign::CENTER, "(-__-)");
       }

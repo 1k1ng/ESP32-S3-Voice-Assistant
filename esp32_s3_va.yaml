@@ -100,10 +100,11 @@ font:
   - file: "gfonts://Roboto Mono"
     id: font_small
     size: 10
-  - file: "gfonts://Roboto Mono"
+  - file: "fonts/DejaVuSans.ttf"
     id: font_big
-    size: 14
-
+    size: 28
+    glyphs: '!"%()+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyzäöüÄÖÜß°‿◕⇀≖▃ب'
+ 
 sensor:
   - platform: uptime
     name: "Uptime"
@@ -205,20 +206,26 @@ display:
     address: 0x3C
     update_interval: 500ms
     lambda: |-
-      if (id(ip_addr).has_state()) {
-        it.printf(0, 0, id(font_small), "IP %s", id(ip_addr).state.c_str());
-      } else {
-        it.print(0, 0, id(font_small), "IP ...");
-      }
+      int x = it.get_width() / 2;
+      int y = it.get_height() / 2;
 
+      // Pwnagotchi Logik - Zentriert über das ganze Display
       if (id(mic_mute).state) {
-        it.print(0, 16, id(font_big), "MUTE");
+        it.print(x, y, id(font_big), TextAlign::CENTER, "(ب__ب)"); 
       } else if (id(va).is_running()) {
-        it.print(0, 16, id(font_big), "AKTIV");
+        if (id(esp32_media).state == esphome::media_player::MEDIA_PLAYER_STATE_PLAYING) {
+           it.print(x, y, id(font_big), TextAlign::CENTER, "(°▃▃°)"); 
+        } else {
+           it.print(x, y, id(font_big), TextAlign::CENTER, "(◕‿‿◕)");
+        }
       } else if (id(mww).is_running()) {
-        it.print(0, 16, id(font_big), "BEREIT");
+        if ((millis() / 2000) % 2 == 0) {
+          it.print(x, y, id(font_big), TextAlign::CENTER, "(-‿‿-)"); 
+        } else {
+          it.print(x, y, id(font_big), TextAlign::CENTER, "(≖‿‿≖)");
+        }
       } else {
-        it.print(0, 16, id(font_big), "WARTET");
+        it.print(x, y, id(font_big), TextAlign::CENTER, "(-__-)");
       }
 
 interval:
@@ -538,7 +545,7 @@ script:
           red: 100%
           green: 60%
           blue: 0%
-          effect:none
+          effect: none
 
   - id: led_speaking
     then:

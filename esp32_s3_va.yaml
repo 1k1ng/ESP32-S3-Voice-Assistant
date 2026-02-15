@@ -65,6 +65,12 @@ wifi:
   ap:
     ssid: esp32s3-va-fallback
     password: !secret ap_password
+  power_save_mode: NONE
+  fast_connect: true
+  manual_ip:
+   static_ip: 192.168.178.111
+   gateway: 192.168.178.1
+   subnet: 255.255.255.0
 
 network:
   enable_high_performance: true
@@ -266,8 +272,8 @@ microphone:
     i2s_audio_id: i2s_bus
     adc_type: external
     i2s_din_pin: GPIO4
-    channel: left
-    sample_rate: 16000
+    channel: right
+    #sample_rate: 16000 #wenn getrennte i2s busse für audo und mic dann entkommentieren
     bits_per_sample: 32bit
     use_apll: true
     pdm: false
@@ -303,7 +309,7 @@ media_player:
   - platform: speaker
     name: "ESP32 Speaker"
     id: esp32_media
-    buffer_size: 131072
+    buffer_size: 65536
     codec_support_enabled: true
 
     announcement_pipeline:
@@ -385,41 +391,25 @@ voice_assistant:
   volume_multiplier: 15.0
 
   on_listening:
-    then:
-      - script.execute: led_listening
+    - then:
+        - script.execute: led_listening
+        - script.execute: volume_dim # Musik leise machen via Script
 
   on_stt_vad_end:
-    then:
-      - script.execute: led_thinking
+    - then:
+        - script.execute: led_thinking
 
   on_tts_start:
-    then:
-      - script.execute: start_wake_word
-      - script.execute: led_speaking
+    - then:
+        - script.execute: start_wake_word
+        - script.execute: led_speaking
 
   on_tts_end:
-    then:
-      - delay: 150ms
-      - script.execute: led_ready
-      - script.execute: start_wake_word
-
-  on_start:
-    then:
-      - script.execute: stop_wake_word
-      - script.execute: start_wake_word
-
-  on_end:
-    then:
-      - script.execute: led_ready
-      - script.execute: start_wake_word
-
-  on_error:
-    then:
-      - script.execute: led_error
-      - delay: 1s
-      - script.execute: led_ready
-      - delay: 300ms
-      - script.execute: start_wake_word
+    - then:
+        - delay: 150ms
+        - script.execute: led_ready
+        - script.execute: start_wake_word
+        - script.execute: volume_reset # Musik laut machen via Script
 
 select:
   - platform: template
@@ -450,6 +440,17 @@ select:
         - script.execute: start_wake_word
 
 script:
+  - id: volume_dim
+    then:
+      - lambda: |-
+          id(media_resamp).set_volume(0.1f);
+          id(media_resamp).status_set_warning(); // Optional: zeigt Aktivität im Log
+
+  - id: volume_reset
+    then:
+      - lambda: |-
+          id(media_resamp).set_volume(0.6f);
+          id(media_resamp).status_clear_warning();
   - id: apply_wake_word_model
     then:
       - if:

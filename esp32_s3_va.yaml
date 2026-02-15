@@ -1,16 +1,29 @@
 substitutions:
-  led_pin: GPIO15
-  button_pin: GPIO17
+  # --- Allgemeine Komponenten ---
+  led_pin: GPIO15      # DIN / Data am LED Ring
+  button_pin: GPIO17   # Touch / Button Signal
 
-  i2s_lrclk: GPIO6
-  i2s_bclk: GPIO7
-  mic_dout: GPIO4
-  spk_din: GPIO5
+  # --- I2S Bus 1 (Aktuell: Geteilt / Zukunft: Nur Lautsprecher) ---
+  # Beschriftung am Modul (z.B. MAX98357A):
+  i2s_bclk: GPIO7      # BCLK / Bit Clock
+  i2s_lrclk: GPIO6     # LRC / WS (Word Select)
+  spk_din: GPIO5       # DIN / SD (Speaker Data In)
+  
+  # --- Mikrofon Datenleitung (Aktuell auf Bus 1) ---
+  mic_dout: GPIO4      # SD / DOUT (Mic Data Out)
 
-  i2c_sda: GPIO10
-  i2c_scl: GPIO11
+  # --- I2S Bus 2 (ZUKUNFT: Separater Bus für Mikrofon) ---
+  # Wenn du umbaust, nutzt das Mikrofon diese eigenen Clock-Leitungen:
+  # mic_bclk: GPIO1    # SCK / BCLK am Mikrofon
+  # mic_lrclk: GPIO2   # WS / L/R am Mikrofon
+  # mic_dout bleibt GPIO4
 
-  #amp_sd_pin: GPIO18
+  # --- I2C Bus (Display) ---
+  # Beschriftung am OLED:
+  i2c_sda: GPIO10      # SDA
+  i2c_scl: GPIO11      # SCL
+
+  # amp_sd_pin: GPIO18 # SD / Shutdown Pin (falls vorhanden)
 
 esphome:
   name: esp32s3-voice-assistant

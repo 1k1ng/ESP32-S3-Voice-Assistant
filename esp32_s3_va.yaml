@@ -193,6 +193,12 @@ switch:
   #  restore_mode: ALWAYS_OFF
 
   - platform: template
+    id: manual_light_mode
+    name: "Manueller Licht Modus"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+
+  - platform: template
     id: mic_mute
     name: "Mute"
     optimistic: true
@@ -524,7 +530,11 @@ script:
 
   - id: led_ready
     then:
-      - light.turn_off: led_ring
+      - if:
+          condition:
+            switch.is_off: manual_light_mode
+          then:
+            - light.turn_off: led_ring
 
   - id: led_mute
     then:

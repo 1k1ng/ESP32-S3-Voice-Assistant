@@ -93,6 +93,15 @@ psram:
   speed: 80MHz
   ignore_not_found: false
 
+globals:
+  - id: timer_display_text
+    type: std::string
+    initial_value: '""'
+
+time:
+  - platform: homeassistant
+    id: esptime
+
 i2c:
   sda: ${i2c_sda}
   scl: ${i2c_scl}
@@ -228,19 +237,30 @@ display:
       int x = it.get_width() / 2;
       int y = it.get_height() / 2;
 
-      // Pwnagotchi Logik - Zentriert über das ganze Display
+      // 1. Mute-Status (Höchste Priorität)
       if (id(mic_mute).state) {
         it.print(x, y, id(font_big), TextAlign::CENTER, "(ب__ب)"); 
-      } else if (id(va).is_running()) {
+      } 
+      
+      // 2. Aktive Interaktion (Zuhören, Denken, Sprechen)
+      else if (id(va).is_running()) {
         if (id(esp32_media).state == esphome::media_player::MEDIA_PLAYER_STATE_PLAYING) {
            it.print(x, y, id(font_big), TextAlign::CENTER, "(°▃▃°)"); 
         } else {
            it.print(x, y, id(font_big), TextAlign::CENTER, "(◕‿‿◕)");
         }
-      } else if (id(mww).is_running()) {
-        it.print(x, y, id(font_big), TextAlign::CENTER, "(-‿‿-)"); 
-      } else {
-        it.print(x, y, id(font_big), TextAlign::CENTER, "(-__-)");
+      } 
+      
+      // 3. TIMER-ANZEIGE (Priorität vor der Uhrzeit!)
+      // Wenn ein Timer läuft, wird dieser dauerhaft angezeigt
+      else if (!id(timer_display_text).empty()) {
+        it.printf(x, y, id(font_big), TextAlign::CENTER, id(timer_display_text).c_str());
+      }
+      
+      // 4. IDLE-STATUS / Wake-Word aktiv (Uhrzeit anzeigen)
+      else {
+        // Zeigt die Uhrzeit nur, wenn kein Timer aktiv ist
+        it.strftime(x, y, id(font_big), TextAlign::CENTER, "%H:%M", id(esptime).now());
       }
 
 interval:
@@ -426,6 +446,32 @@ voice_assistant:
   auto_gain: 31dBFS
   volume_multiplier: 15.0
 
+  on_timer_tick:
+    - lambda: |-
+        if (!timers.empty()) {
+          // In der neuesten API ist 'seconds_left' der Standard
+          int total_seconds = timers[0].seconds_left; 
+          int minutes = total_seconds / 60;
+          int seconds = total_seconds % 60;
+          id(timer_display_text) = str_sprintf("%02d:%02d", minutes, seconds);
+        } else {
+          id(timer_display_text) = "";
+        }
+
+  on_timer_finished:
+    - then:
+        - lambda: 'id(timer_display_text) = "";'
+        - script.execute: led_error
+        - light.turn_on:
+            id: led_ring
+            effect: fast_pulse
+            red: 100%
+            green: 0%
+            blue: 0%
+        - delay: 20s
+        - light.turn_off: led_ring
+        - script.execute: led_ready
+
   on_listening:
     - then:
         - script.execute: led_listening
@@ -488,13 +534,16 @@ script:
     then:
       - if:
           condition:
-            lambda: return id(wake_word_select).state == "Nabu";
+            # Prüfe auf den exakten Namen aus deiner 'select' Sektion
+            lambda: return id(wake_word_select).current_option() == "Jarvis";
           then:
-            - micro_wake_word.enable_model: nabu_model
-            - micro_wake_word.disable_model: jarvis_model
-          else:
+            # Wenn Jarvis gewählt ist, aktiviere auch Jarvis
             - micro_wake_word.enable_model: jarvis_model
             - micro_wake_word.disable_model: nabu_model
+          else:
+            # Ansonsten (wenn Nabu gewählt ist)
+            - micro_wake_word.enable_model: nabu_model
+            - micro_wake_word.disable_model: jarvis_model
   - id: start_wake_word
     then:
       - if:

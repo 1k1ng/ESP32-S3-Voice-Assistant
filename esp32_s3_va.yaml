@@ -108,6 +108,9 @@ i2c:
   scan: true
   frequency: 400kHz
 
+rtttl:
+  speaker: ann_resamp
+
 
 captive_portal:
 
@@ -460,7 +463,22 @@ voice_assistant:
 
   on_timer_finished:
     - then:
+        # 1. Alles stoppen & Bus freigeben
+        - micro_wake_word.stop
+        - voice_assistant.stop
+        - media_player.stop: esp32_media
+        
+        # 2. LAUTSTÄRKE ERHÖHEN (nur für den Alarm-Kanal)
+        # 1.0f entspricht 100%, du kannst auch höher gehen (z.B. 1.5f), 
+        # aber Vorsicht wegen Übersteuerung/Verzerrung.
+        - lambda: 'id(ann_resamp).set_volume(1.0f);'
+        
         - lambda: 'id(timer_display_text) = "";'
+        
+        # 3. Den Ton abspielen
+        - rtttl.play: "alarm:d=8,o=5,b=140:4c6,4g5,4c6,4g5"
+        
+        # 4. Visueller Alarm
         - script.execute: led_error
         - light.turn_on:
             id: led_ring
@@ -468,9 +486,15 @@ voice_assistant:
             red: 100%
             green: 0%
             blue: 0%
-        - delay: 20s
+            
+        - delay: 10s 
+        
+        # 5. Aufräumen & LAUTSTÄRKE ZURÜCKSETZEN
+        - rtttl.stop:
+        - lambda: 'id(ann_resamp).set_volume(0.6f);' # Zurück auf Standardwert
         - light.turn_off: led_ring
         - script.execute: led_ready
+        - script.execute: start_wake_word
 
   on_listening:
     - then:

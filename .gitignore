@@ -1,2 +1,11 @@
+# Deine Passwörter und WLAN-Daten
 secrets.yaml
+
+# ESPHome Build-Dateien und Cache (wichtig!)
+.esphome/
+.build/
+
+# Betriebssystem-Dateien
 .DS_Store
+Thumbs.db
+*.bak

@@ -1,155 +1,155 @@
-## ESP32 S3 Voice Assistant mit ESPHome
+## ESP32 S3 Voice Assistant with ESPHome
 
-Dieses Repository enthält ein komplettes ESPHome Setup für einen kompakten Sprachassistenten auf Basis eines ESP32 S3 DevKitC. Mit dabei sind ein I2S Verstärker für Audioausgabe, ein I2S Mikrofon für Spracheingabe, ein WS2812 LED Ring als Statusanzeige und ein SSD1306 OLED Display für einfache Zustände im Pwnagotchi Stil.
+This repository contains a complete ESPHome setup for a compact voice assistant based on an ESP32 S3 DevKitC. It features an I2S amplifier for audio output, an I2S microphone for voice input, a WS2812 LED ring as a status indicator, and an SSD1306 OLED display for simple status expressions in a Pwnagotchi-inspired style.
 
-## Funktionen
+## Features
 
-1. Sprachassistent in Home Assistant über ESPHome Voice Assistant
-2. Wake Word Erkennung direkt auf dem ESP32 über Micro Wake Word
-3. Umschaltbares Wake Word über ein Select in Home Assistant
-4. Touch Button Bedienung für Licht und Mikrofon Stummschaltung
-5. LED Ring Statusanzeige für Ready, Listening, Thinking, Speaking, Mute, Error
-6. OLED Display mit Gesichtsausdrücken je nach Zustand
-7. Media Player Wiedergabe über den ESPHome Speaker Media Player
-8. Automatisches Stoppen von Wake Word und Voice Assistant während Musikwiedergabe
+1. Voice assistant integration in Home Assistant via ESPHome Voice Assistant
+2. On-device Wake Word detection on the ESP32 via Micro Wake Word
+3. Switchable Wake Word via a select entity in Home Assistant
+4. Touch button control for toggling light and muting the microphone
+5. LED ring status indicator for Ready, Listening, Thinking, Speaking, Mute, and Error
+6. OLED display showing facial expressions based on the current state
+7. Media player playback via the ESPHome Speaker Media Player
+8. Automatic suspension of Wake Word and Voice Assistant during music playback
 
 ## Hardware
 
-Verwendete Bauteile im gezeigten Aufbau
+Components used in the shown setup:
 
 1. ESP32 S3 DevKitC
-2. I2S Class D Verstärker Breakout, zum Beispiel MAX98357A
-3. I2S Mikrofon Modul
-4. WS2812 LED Ring mit 45 LEDs
-5. SSD1306 OLED Display 128x32 über I2C
-6. Touch Button oder Taster Eingang
+2. I2S Class D Amplifier Breakout (e.g., MAX98357A)
+3. I2S Microphone Module
+4. WS2812 LED Ring with 45 LEDs
+5. SSD1306 OLED Display 128x32 via I2C
+6. Touch Button or push button input
 
-Das Schaltbild als PNG ist im Repository enthalten und zeigt die Verdrahtung passend zu den Pins in der YAML.
+The circuit diagram is included in the repository as a PNG file and shows the wiring matching the pins configured in the YAML.
 
-## Pinbelegung
+## Pinout
 
-WS2812 Data In: GPIO15
-Touch Button: GPIO17
+WS2812 Data In: GPIO15  
+Touch Button: GPIO17  
 
-I2S BCLK: GPIO7
-I2S LRCLK: GPIO6
-Speaker Data Out: GPIO5
-Mic Data In: GPIO4
+I2S BCLK: GPIO7  
+I2S LRCLK: GPIO6  
+Speaker Data Out: GPIO5  
+Mic Data In: GPIO4  
 
-I2C SDA: GPIO10
-I2C SCL: GPIO11
+I2C SDA: GPIO10  
+I2C SCL: GPIO11  
 
-Versorgung Verstärker: 5V und GND
-Versorgung OLED: 3V3 und GND
+Amplifier Power: 5V and GND  
+OLED Power: 3V3 and GND  
 
-Hinweis: Mikrofon und Lautsprecher teilen sich aktuell die I2S Clock Leitungen. In der YAML ist bereits ein optionaler Plan für einen späteren zweiten I2S Bus für das Mikrofon kommentiert.
+Note: The microphone and speaker currently share the I2S clock lines. An optional plan for a future second I2S bus dedicated to the microphone is already commented out in the YAML file.
 
-## Bedienung
+## Operation
 
-Touch Button Aktionen
+Touch Button Actions:
 
-1. Kurzer Klick
-   LED Ring umschalten
+1. Short click:  
+   Toggle the LED ring light.
 
-2. Doppelklick
-   Mikrofon Stummschaltung umschalten
+2. Double click:  
+   Toggle microphone mute.
 
-3. Langer Druck
-   Voice Assistant starten, sofern nicht stumm
+3. Long press:  
+   Trigger the Voice Assistant (if not muted).
 
-Beim Loslassen wird ein laufender Voice Assistant wieder gestoppt.
+Releasing the button will stop an ongoing Voice Assistant session.
 
-Wake Word Auswahl
+Wake Word Selection:
 
-In Home Assistant erscheint ein Select mit zwei Optionen
+A select entity appears in Home Assistant with two options:
 
 1. Jarvis
 2. Nabu
 
-Beim Wechsel werden die Modelle entsprechend aktiviert und deaktiviert.
+Changing the selection dynamically enables and disables the respective models.
 
-## Anzeigeverhalten
+## Display & Indicator Behavior
 
-OLED Display
+OLED Display:
 
-Das Display zeigt je nach Zustand ein zentriertes Gesicht
+The display shows a centered face depending on the current state:
 
-1. Mute aktiv
-   Böser Blick
+1. Mute active:  
+   Angry look
 
-2. Voice Assistant läuft
-   Beim Abspielen anderes Gesicht als ohne Wiedergabe
+2. Voice Assistant running:  
+   Shows a different face during playback compared to when idle
 
-3. Wake Word Engine läuft
-   Schlafendes Gesicht
+3. Wake Word engine running:  
+   Sleeping face
 
-4. Idle
-   Neutrales Gesicht
+4. Idle:  
+   Neutral face
 
-LED Ring
+LED Ring:
 
-Standardmäßig ist der LED Ring im Ruhezustand aus. Nur bei bestimmten Zuständen wird er aktiv, zum Beispiel Listening, Thinking, Speaking oder Mute. Zusätzlich gibt es einen manuellen Licht Modus, der das automatische Aus Verhalten übersteuert.
+By default, the LED ring is turned off when idle. It only activates during specific states, such as Listening, Thinking, Speaking, or Mute. Additionally, there is a manual light mode that overrides the automatic turn-off behavior.
 
-## Einrichtung
+## Setup
 
-Voraussetzungen
+Prerequisites:
 
-1. Home Assistant mit ESPHome Addon
-2. WLAN Zugangsdaten
-3. API Key und OTA Passwort in secrets
+1. Home Assistant with the ESPHome add-on installed
+2. Wi-Fi credentials
+3. API key and OTA password stored in secrets
 
-Schritte
+Steps:
 
-1. YAML in ESPHome anlegen und ins Gerät flashen
-2. secrets Datei befüllen
-   wifi_ssid
-   wifi_password
-   api_key
-   ota_password
-   ap_password
-3. Gerät starten und in Home Assistant übernehmen
-4. In Home Assistant den Voice Assistant Dienst konfigurieren, falls noch nicht vorhanden
+1. Create the YAML configuration in ESPHome and flash it to the device.
+2. Fill out your `secrets.yaml` file with:  
+   `wifi_ssid`  
+   `wifi_password`  
+   `api_key`  
+   `ota_password`  
+   `ap_password`  
+3. Start the device and adopt it in Home Assistant.
+4. Configure the Voice Assistant pipeline in Home Assistant if you haven't already.
 
-## Wichtige Hinweise zu Audio
+## Important Audio Notes
 
-1. Sample Rate ist auf 44100 gesetzt, passend zur Media Pipeline
-2. PSRAM ist aktiv, um Puffer stabil zu halten
-3. Während Media Playback werden Wake Word und Voice Assistant gestoppt und das Mikrofon gemutet
-4. Nach Ende der Wiedergabe wird das Mikrofon wieder aktiviert und Wake Word erneut gestartet
+1. The sample rate is set to 44100 Hz to match the media pipeline.
+2. PSRAM is enabled to ensure stable buffer management.
+3. During media playback, the Wake Word and Voice Assistant are paused, and the microphone is muted.
+4. Once playback ends, the microphone is unmuted, and the Wake Word engine restarts.
 
-## Fehlerbehebung
+## Troubleshooting
 
-Wake Word reagiert nicht zuverlässig
+Wake Word is unreliable:
 
-1. Prüfe, ob das Mikrofon wirklich ungemutet ist
-2. Achte auf ausreichende 3V3 Versorgung und kurze Leitungen
-3. Gain Factor in Micro Wake Word kann angepasst werden
-4. Stelle sicher, dass keine gleichzeitige Media Wiedergabe läuft
+1. Check if the microphone is actually unmuted.
+2. Ensure a stable 3V3 power supply and keep wire lengths short.
+3. The Gain Factor in Micro Wake Word can be adjusted.
+4. Make sure no media playback is running simultaneously.
 
-Keine Audioausgabe
+No audio output:
 
-1. I2S Pins prüfen, besonders BCLK, LRCLK, DOUT
-2. Verstärker Versorgung 5V und GND prüfen
-3. Falls dein Verstärker einen Shutdown Pin hat, optional in der YAML aktivieren
+1. Verify the I2S pins, especially BCLK, LRCLK, and DOUT.
+2. Check the 5V and GND power supply to the amplifier.
+3. If your amplifier has a Shutdown (SD) pin, you can optionally enable it in the YAML.
 
-OLED bleibt leer
+OLED remains blank:
 
-1. I2C Scan aktiv lassen und Log prüfen
-2. Adresse 0x3C ist Standard, manche Displays nutzen 0x3D
-3. SDA und SCL tauschen falls nötig
+1. Keep the I2C scan active and check the logs.
+2. Address `0x3C` is standard, though some displays use `0x3D`.
+3. Swap SDA and SCL lines if necessary.
 
-## Projektstruktur Empfehlung
+## Recommended Project Structure
 
-Optional, falls du es im Repository sauber trennen willst
+Optional, if you want to keep your repository organized:
 
-1. config Ordner mit der ESPHome YAML
-2. docs Ordner mit Schaltbild und Fotos
-3. fonts Ordner für lokale Schriftarten
+1. `config` folder containing the ESPHome YAML
+2. `docs` folder containing the circuit diagram and photos
+3. `fonts` folder for local font files
 
-## Lizenz
+## License
 
-Wähle hier deine gewünschte Lizenz, zum Beispiel MIT, und füge die Lizenzdatei ins Repository ein.
+Choose your preferred license here (e.g., MIT) and add the LICENSE file to the repository.
 
-## Danksagung
+## Acknowledgments
 
-ESPHome und Home Assistant Community für Voice Assistant, Micro Wake Word und die Audio Komponenten.
+Thanks to the ESPHome and Home Assistant communities for providing the Voice Assistant, Micro Wake Word components, and audio framework.

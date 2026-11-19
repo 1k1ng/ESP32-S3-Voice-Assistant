@@ -1,29 +1,29 @@
 substitutions:
-  # --- Allgemeine Komponenten ---
-  led_pin: GPIO15      # DIN / Data am LED Ring
-  button_pin: GPIO17   # Touch / Button Signal
+  # --- General components ---
+  led_pin: GPIO15      # DIN / data on the LED ring
+  button_pin: GPIO17   # Touch / button signal
 
-  # --- I2S Bus 1 (Aktuell: Geteilt / Zukunft: Nur Lautsprecher) ---
-  # Beschriftung am Modul (z.B. MAX98357A):
+  # --- I2S bus 1 (currently: shared / future: speaker only) ---
+  # Label on the module (e.g. MAX98357A):
   i2s_bclk: GPIO7      # BCLK / Bit Clock
   i2s_lrclk: GPIO6     # LRC / WS (Word Select)
   spk_din: GPIO5       # DIN / SD (Speaker Data In)
   
-  # --- Mikrofon Datenleitung (Aktuell auf Bus 1) ---
+  # --- Microphone data line (currently on bus 1) ---
   mic_dout: GPIO4      # SD / DOUT (Mic Data Out)
 
-  # --- I2S Bus 2 (ZUKUNFT: Separater Bus für Mikrofon) ---
-  # Wenn du umbaust, nutzt das Mikrofon diese eigenen Clock-Leitungen:
-  # mic_bclk: GPIO1    # SCK / BCLK am Mikrofon
-  # mic_lrclk: GPIO2   # WS / L/R am Mikrofon
-  # mic_dout bleibt GPIO4
+  # --- I2S bus 2 (FUTURE: separate bus for the microphone) ---
+  # After rewiring, the microphone uses its own clock lines:
+  # mic_bclk: GPIO1    # SCK / BCLK on the microphone
+  # mic_lrclk: GPIO2   # WS / L/R on the microphone
+  # mic_dout stays on GPIO4
 
   # --- I2C Bus (Display) ---
-  # Beschriftung am OLED:
+  # Label on the OLED:
   i2c_sda: GPIO10      # SDA
   i2c_scl: GPIO11      # SCL
 
-  # amp_sd_pin: GPIO18 # SD / Shutdown Pin (falls vorhanden)
+  # amp_sd_pin: GPIO18 # SD / shutdown pin (if available)
 
 esphome:
   name: esp32s3-voice-assistant
@@ -81,9 +81,9 @@ wifi:
   power_save_mode: NONE
   fast_connect: true
   manual_ip:
-   static_ip: 192.168.178.111
-   gateway: 192.168.178.1
-   subnet: 255.255.255.0
+   static_ip: !secret legacy_static_ip
+   gateway: !secret wifi_gateway
+   subnet: !secret wifi_subnet
 
 network:
   enable_high_performance: true
@@ -128,7 +128,7 @@ font:
   - file: "fonts/DejaVuSans.ttf"
     id: font_big
     size: 28
-    glyphs: '!"%()+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyzäöüÄÖÜß°‿◕⇀≖▃ب'
+    glyphs: '!"%()+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ^_abcdefghijklmnopqrstuvwxyzäöüÄÖÜß°'
  
 sensor:
   - platform: uptime
@@ -206,7 +206,7 @@ switch:
 
   - platform: template
     id: manual_light_mode
-    name: "Manueller Licht Modus"
+    name: "Manual Light Mode"
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
 
@@ -240,29 +240,29 @@ display:
       int x = it.get_width() / 2;
       int y = it.get_height() / 2;
 
-      // 1. Mute-Status (Höchste Priorität)
+      // 1. Mute state (highest priority)
       if (id(mic_mute).state) {
-        it.print(x, y, id(font_big), TextAlign::CENTER, "(ب__ب)"); 
+        it.print(x, y, id(font_big), TextAlign::CENTER, "(-_-)"); 
       } 
       
-      // 2. Aktive Interaktion (Zuhören, Denken, Sprechen)
+      // 2. Active interaction (listening, thinking, speaking)
       else if (id(va).is_running()) {
         if (id(esp32_media).state == esphome::media_player::MEDIA_PLAYER_STATE_PLAYING) {
-           it.print(x, y, id(font_big), TextAlign::CENTER, "(°▃▃°)"); 
+           it.print(x, y, id(font_big), TextAlign::CENTER, "(^_^)"); 
         } else {
-           it.print(x, y, id(font_big), TextAlign::CENTER, "(◕‿‿◕)");
+           it.print(x, y, id(font_big), TextAlign::CENTER, "(o_o)");
         }
       } 
       
-      // 3. TIMER-ANZEIGE (Priorität vor der Uhrzeit!)
-      // Wenn ein Timer läuft, wird dieser dauerhaft angezeigt
+      // 3. TIMER DISPLAY (takes priority over the clock!)
+      // While a timer is running, it is shown permanently
       else if (!id(timer_display_text).empty()) {
         it.printf(x, y, id(font_big), TextAlign::CENTER, id(timer_display_text).c_str());
       }
       
-      // 4. IDLE-STATUS / Wake-Word aktiv (Uhrzeit anzeigen)
+      // 4. IDLE / wake word active (show the clock)
       else {
-        // Zeigt die Uhrzeit nur, wenn kein Timer aktiv ist
+        // Shows the clock only when no timer is active
         it.strftime(x, y, id(font_big), TextAlign::CENTER, "%H:%M", id(esptime).now());
       }
 
@@ -332,7 +332,7 @@ microphone:
     adc_type: external
     i2s_din_pin: GPIO4
     channel: right
-    #sample_rate: 16000 #wenn getrennte i2s busse für audo und mic dann entkommentieren
+    #sample_rate: 16000 # uncomment when using separate I2S buses for audio and mic
     bits_per_sample: 32bit
     use_apll: true
     pdm: false
@@ -452,7 +452,7 @@ voice_assistant:
   on_timer_tick:
     - lambda: |-
         if (!timers.empty()) {
-          // In der neuesten API ist 'seconds_left' der Standard
+          // In the latest API 'seconds_left' is the default
           int total_seconds = timers[0].seconds_left; 
           int minutes = total_seconds / 60;
           int seconds = total_seconds % 60;
@@ -463,22 +463,22 @@ voice_assistant:
 
   on_timer_finished:
     - then:
-        # 1. Alles stoppen & Bus freigeben
+        # 1. Stop everything & free the bus
         - micro_wake_word.stop
         - voice_assistant.stop
         - media_player.stop: esp32_media
         
-        # 2. LAUTSTÄRKE ERHÖHEN (nur für den Alarm-Kanal)
-        # 1.0f entspricht 100%, du kannst auch höher gehen (z.B. 1.5f), 
-        # aber Vorsicht wegen Übersteuerung/Verzerrung.
+        # 2. RAISE VOLUME (alarm channel only)
+        # 1.0f equals 100%, you can go higher (e.g. 1.5f),
+        # but watch out for clipping/distortion.
         - lambda: 'id(ann_resamp).set_volume(1.0f);'
         
         - lambda: 'id(timer_display_text) = "";'
         
-        # 3. Den Ton abspielen
+        # 3. Play the tone
         - rtttl.play: "alarm:d=8,o=5,b=140:4c6,4g5,4c6,4g5"
         
-        # 4. Visueller Alarm
+        # 4. Visual alarm
         - script.execute: led_error
         - light.turn_on:
             id: led_ring
@@ -489,9 +489,9 @@ voice_assistant:
             
         - delay: 10s 
         
-        # 5. Aufräumen & LAUTSTÄRKE ZURÜCKSETZEN
+        # 5. Clean up & RESET VOLUME
         - rtttl.stop:
-        - lambda: 'id(ann_resamp).set_volume(0.6f);' # Zurück auf Standardwert
+        - lambda: 'id(ann_resamp).set_volume(0.6f);' # Back to default value
         - light.turn_off: led_ring
         - script.execute: led_ready
         - script.execute: start_wake_word
@@ -499,7 +499,7 @@ voice_assistant:
   on_listening:
     - then:
         - script.execute: led_listening
-        - script.execute: volume_dim # Musik leise machen via Script
+        - script.execute: volume_dim # Duck music via script
 
   on_stt_vad_end:
     - then:
@@ -512,7 +512,7 @@ voice_assistant:
 
   on_tts_end:
     - then:
-        - script.execute: volume_reset # Musik laut machen via Script
+        - script.execute: volume_reset # Restore music volume via script
 
 select:
   - platform: template
@@ -547,7 +547,7 @@ script:
     then:
       - lambda: |-
           id(media_resamp).set_volume(0.1f);
-          id(media_resamp).status_set_warning(); // Optional: zeigt Aktivität im Log
+          id(media_resamp).status_set_warning(); // Optional: shows activity in the log
 
   - id: volume_reset
     then:
@@ -558,14 +558,14 @@ script:
     then:
       - if:
           condition:
-            # Prüfe auf den exakten Namen aus deiner 'select' Sektion
+            # Check for the exact name from your 'select' section
             lambda: return id(wake_word_select).current_option() == "Jarvis";
           then:
-            # Wenn Jarvis gewählt ist, aktiviere auch Jarvis
+            # If Jarvis is selected, enable Jarvis
             - micro_wake_word.enable_model: jarvis_model
             - micro_wake_word.disable_model: nabu_model
           else:
-            # Ansonsten (wenn Nabu gewählt ist)
+            # Otherwise (if Nabu is selected)
             - micro_wake_word.enable_model: nabu_model
             - micro_wake_word.disable_model: jarvis_model
   - id: start_wake_word
@@ -641,7 +641,7 @@ script:
 
   - id: led_speaking
     then:
-      - light.turn_off: led_ring     # Kurzer Reset sorgt für sauberen Start
+      - light.turn_off: led_ring     # Short reset ensures a clean start
       - delay: 20ms
       - light.turn_on:
           id: led_ring
